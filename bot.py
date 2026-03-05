@@ -1,6 +1,9 @@
 """Telegram 机器人主程序"""
 import logging
+import os
+import threading
 from functools import partial
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from telegram.ext import Application, CommandHandler
 
@@ -31,6 +34,22 @@ from handlers.admin_commands import (
     listkeys_command,
     broadcast_command,
 )
+
+# --- بداية كود السيرفر الوهمي (لخداع منصة Render) ---
+class DummyHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain')
+        self.end_headers()
+        self.wfile.write(b"Bot is alive and running!")
+
+def run_dummy_server():
+    # Render يعطينا رقم المنفذ (Port) تلقائياً، وإذا لم يجده يستخدم 10000
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), DummyHandler)
+    server.serve_forever()
+# --- نهاية كود السيرفر الوهمي ---
+
 
 # 配置日志
 logging.basicConfig(
@@ -87,6 +106,11 @@ def main():
     application.add_error_handler(error_handler)
 
     logger.info("机器人启动中...")
+    
+    # تشغيل السيرفر الوهمي في الخلفية
+    threading.Thread(target=run_dummy_server, daemon=True).start()
+    logger.info("تم تشغيل السيرفر الوهمي لمنع إيقاف Render بنجاح!")
+
     application.run_polling(drop_pending_updates=True)
 
 
